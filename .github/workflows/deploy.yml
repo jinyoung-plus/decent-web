@@ -1,0 +1,40 @@
+name: Deploy Website to IPFS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install IPFS
+      run: |
+        wget -qO- https://dist.ipfs.io/go-ipfs/v0.8.0/go-ipfs_v0.8.0_linux-amd64.tar.gz | tar -xzv
+        sudo mv go-ipfs/ipfs /usr/local/bin/
+
+    - name: Initialize IPFS
+      run: |
+        ipfs init
+        ipfs daemon &
+
+    - name: Add files to IPFS
+      run: |
+        ipfs add -r .
+
+    - name: Upload to Pinata
+      env:
+        PINATA_API_KEY: ${{ secrets.PINATA_API_KEY }}
+        PINATA_SECRET_API_KEY: ${{ secrets.PINATA_SECRET_API_KEY }}
+      run: |
+        CID=$(ipfs add -r . -Q)
+        echo "Uploading to Pinata..."
+        RESPONSE=$(curl -X POST https://api.pinata.cloud/pinning/pinByHash \
+          -H "pinata_api_key: $PINATA_API_KEY" \
+          -H "pinata_secret_api_key: $PINATA_SECRET_API_KEY" \
+          -H "Content-Type: application/json" \
+          -d "{\"hashToPin\": \"$CID\"}")
+        echo "Pinata Response: $RESPONSE"
